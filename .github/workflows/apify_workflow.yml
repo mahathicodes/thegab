@@ -1,0 +1,49 @@
+name: Daily TikTok Scraping with Apify
+
+on:
+  schedule:
+    - cron: '0 2 * * *'  # Daily at 2 AM UTC (9 PM EST)
+  workflow_dispatch:     # Manual trigger
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install requests spacy rapidfuzz pandas supabase python-dotenv
+          python -m spacy download en_core_web_sm
+
+      - name: Run TikTok scraper (Apify)
+        run: python apify_scraper.py
+        env:
+          APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        timeout-minutes: 30
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scraper-logs
+          path: |
+            posts_raw_*.json
+            summary_*.json
+          retention-days: 7
+
+      - name: Notify on success
+        if: success()
+        run: |
+          echo "✅ Apify scraping completed successfully!"
+          echo "Posts saved: $(ls -1 posts_raw_*.json 2>/dev/null | wc -l) files"
