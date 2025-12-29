@@ -30,6 +30,7 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install TikTokApi spacy rapidfuzz pandas supabase python-dotenv
+          python -m playwright install chromium
           python -m spacy download en_core_web_sm
 
       - name: Run TikTok scraper
