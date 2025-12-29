@@ -98,11 +98,13 @@ def scrape_tiktok_with_apify(hashtag: str, max_posts: int = 50) -> List[Dict]:
 
     # Configure scraper
     input_data = {
-        "hashtag": hashtag,
-        "videos": max_posts,
+        "startUrls": [f"https://www.tiktok.com/tag/{hashtag}"],
+        "maxItems": max_posts,
+        "location": "CA",
+        "dateRange": "DEFAULT",
+        "sortType": "RELEVANCE",
         "proxy": {
-            "useApifyProxy": True,
-            "apifyProxyGroups": ["RESIDENTIAL"]
+            "useApifyProxy": True
         }
     }
 
