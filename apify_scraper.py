@@ -94,7 +94,7 @@ def scrape_tiktok_with_apify(hashtag: str, max_posts: int = 50) -> List[Dict]:
 
     # Apify API endpoint (API Dojo TikTok Scraper)
     actor_id = "apidojo/tiktok-scraper"
-    run_url = f"https://api.apify.com/v2/acts/{actor_id}/runs"
+    run_url = f"https://api.apify.com/v2/acts/{actor_id}/call"
 
     # Configure scraper
     input_data = {
