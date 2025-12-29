@@ -87,16 +87,14 @@ def scrape_tiktok_with_apify(hashtag: str, max_posts: int = 50) -> List[Dict]:
     APIFY_TOKEN = os.getenv('APIFY_TOKEN')
     if not APIFY_TOKEN:
         print("❌ Missing APIFY_TOKEN environment variable")
-        print("   Set it in GitHub Secrets")
         return []
 
     print(f"  📡 Calling Apify API for #{hashtag}...")
 
-    # Apify API endpoint
     actor_id = "apidojo/tiktok-scraper"
-    run_url = f"https://api.apify.com/v2/acts/{actor_id}/call"
+    run_url = f"https://api.apify.com/v2/acts/{actor_id}/runs?token={APIFY_TOKEN}"
 
-    # Configure scraper - match what worked on the web
+    # Configure scraper
     input_data = {
         "customMapFunction": "(object) => { return {...object} }",
         "dateRange": "THIS_MONTH",
@@ -107,30 +105,54 @@ def scrape_tiktok_with_apify(hashtag: str, max_posts: int = 50) -> List[Dict]:
         "sortType": "RELEVANCE"
     }
 
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {APIFY_TOKEN}"
-    }
+    headers = {"Content-Type": "application/json"}
 
     try:
-        print(f"  ⏳ Calling Apify (this may take 2-5 minutes)...")
-        # /call endpoint waits for completion and returns results directly
-        response = requests.post(run_url, json=input_data, headers=headers, timeout=600)
+        print(f"  ⏳ Starting Apify run...")
+        response = requests.post(run_url, json=input_data, headers=headers, timeout=60)
         response.raise_for_status()
 
-        run_data = response.json()
-        
-        # Check if it succeeded
-        if run_data.get('data', {}).get('status') != 'SUCCEEDED':
-            print(f"  ❌ Run failed or timed out")
+        run_data = response.json()['data']
+        run_id = run_data['id']
+        dataset_id = run_data['defaultDatasetId']
+
+        print(f"  🔄 Run ID: {run_id}")
+        print(f"  ⏳ Waiting for completion (this may take 2-5 minutes)...")
+
+        # Poll for completion using correct endpoint
+        import time
+        max_wait = 600
+        start_time = time.time()
+
+        while time.time() - start_time < max_wait:
+            status_url = f"https://api.apify.com/v2/actor-runs/{run_id}?token={APIFY_TOKEN}"
+            status_response = requests.get(status_url, headers=headers, timeout=30)
+            status_response.raise_for_status()
+
+            run_status = status_response.json()['data']['status']
+
+            if run_status == 'SUCCEEDED':
+                print(f"  ✅ Run succeeded!")
+                break
+            elif run_status == 'FAILED':
+                print(f"  ❌ Run failed")
+                return []
+            else:
+                print(f"     Status: {run_status}...")
+                time.sleep(10)
+        else:
+            print(f"  ⏱️  Run timed out")
             return []
 
-        # Results are in the response
-        videos = run_data.get('data', {}).get('output', {}).get('items', [])
-        
-        print(f"  ✅ Got {len(videos)} videos from Apify")
+        # Get results from dataset
+        print(f"  📥 Fetching results...")
+        dataset_url = f"https://api.apify.com/v2/datasets/{dataset_id}/items?token={APIFY_TOKEN}"
+        dataset_response = requests.get(dataset_url, headers=headers, timeout=30)
+        dataset_response.raise_for_status()
 
-        # Transform Apify data to our format
+        videos = dataset_response.json()
+
+        # Transform to our format
         posts = []
         for video in videos:
             post = {
@@ -149,11 +171,13 @@ def scrape_tiktok_with_apify(hashtag: str, max_posts: int = 50) -> List[Dict]:
             }
             posts.append(post)
 
-        print(f"  ✅ Processed {len(posts)} videos")
+        print(f"  ✅ Fetched {len(posts)} videos")
         return posts
 
     except Exception as e:
         print(f"  ❌ Error: {str(e)[:100]}")
+        import traceback
+        traceback.print_exc()
         return []
 
 
